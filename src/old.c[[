@@ -1,0 +1,173 @@
+// https://tiagohorta1995.medium.com/mosquitto-mqtt-broker-and-esp8266-communcation-in-6-easy-steps-5ea0efae5a10
+
+#include <Arduino.h>
+#include <ESP8266WiFi.h>
+#include <PubSubClient.h>
+
+#define LED_BUILTIN 2
+#define TX 1
+#define RX 3
+#define D0 16
+#define D1 5
+#define D2 4
+#define D3 14
+#define D4 2
+#define D5 14
+#define D6 12
+#define D7 13
+#define D8 15 // Don't use when uploading code
+
+const char *ssid = "MEDNA";               // Enter your WiFi name
+const char *password = "medsci2019";      // Enter WiFi password
+const char *mqttServer = "192.168.1.226"; // Enter your WiFi or Ethernet IP
+const char *topic = "test/topic";
+const int mqttPort = 1883;     // Port number
+const char *mqttUser = "";     // User
+const char *mqttPassword = ""; // Password
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+void MQTTcallback(char *topic, byte *payload, unsigned int length)
+{
+  digitalWrite(LED_BUILTIN, HIGH);
+  Serial.println();
+  Serial.print("Message arrived in topic: ");
+  Serial.println(topic);
+  Serial.print("Message:");
+
+  String message;
+  // int pwm_signal;
+  for (unsigned int i = 0; i < length; i++)
+  {
+    message = message + (char)payload[i]; // Conver *byte to String
+  }
+  Serial.print(message);
+
+  // --------------------------- IMPLIMENT A SWITCH STATEMENT HERE LATER --------------------------- //
+  ///*
+  // Include due date and MEP number
+  // Toggle LED on/off
+  if (message == "on")
+  {
+    digitalWrite(D2, HIGH);
+  }
+  else if (message == "off")
+  {
+    digitalWrite(D2, LOW);
+  }
+  //*/
+  Serial.println();
+  Serial.println("-----------------------");
+  digitalWrite(LED_BUILTIN, HIGH);
+}
+
+void reconnect()
+{
+  while (!client.connected())
+  {
+    digitalWrite(D1, LOW);
+    digitalWrite(LED_BUILTIN, HIGH);
+    String client_id = "esp8266-client-";
+    client_id += String(WiFi.macAddress());
+
+    Serial.printf("The client %s connects to mosquitto mqtt broker\n", client_id.c_str());
+    if (client.connect(client_id.c_str()))
+    {
+      Serial.println("Public emqx mqtt broker connected");
+      digitalWrite(D1, HIGH);
+      digitalWrite(LED_BUILTIN, LOW);
+    }
+    else
+    {
+      Serial.print("failed with state ");
+      Serial.print(client.state());
+      delay(2000);
+    }
+  }
+  client.subscribe(topic);
+  client.publish(topic, "MQTT Re-established");
+}
+
+void setup()
+{
+
+  Serial.begin(115200);
+  pinMode(LED_BUILTIN, OUTPUT); // Onboard LED
+  pinMode(D1, OUTPUT);          // Status LED
+  pinMode(D2, OUTPUT);          // Controllable LED
+  pinMode(D5, OUTPUT);          // Controllable LED
+  // pinMode(LED_BUILTIN, OUTPUT);
+  // digitalWrite(LED_BUILTIN, LOW);
+  // digitalWrite(LED_BUILTIN, HIGH);
+  // digitalWrite(D1, LOW);
+
+  WiFi.begin(ssid, password);
+  Serial.println("\n\nConnecting to WiFi..");
+
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    Serial.print(".");
+    delay(500);
+  }
+  Serial.print("Connected to the WiFi network : ");
+  Serial.println(WiFi.SSID());
+
+  client.setServer(mqttServer, mqttPort);
+  client.setCallback(MQTTcallback);
+
+  while (!client.connected())
+  {
+    String client_id = "esp8266-client-";
+    client_id += String(WiFi.macAddress());
+
+    Serial.println("Connecting to MQTT...");
+
+    if (client.connect(client_id.c_str()))
+    {
+      Serial.println("CONNECTION ESTABLISHED");
+      // Serial.printf("The client %s connects to mosquitto mqtt broker\n", client_id.c_str());
+      digitalWrite(LED_BUILTIN, LOW);
+    }
+    else
+    {
+
+      Serial.print("failed with state ");
+      Serial.print(client.state());
+      delay(2000);
+    }
+  }
+  /*
+  if (client.publish(topic, "Hello from ESP8266") && client.subscribe(topic, 1))
+  {
+    digitalWrite(D1, HIGH);
+    digitalWrite(D2, HIGH);
+
+    client.subscribe(topic);
+    client.publish(topic, "Hello from ESP8266");
+    Serial.print("Client state : ");
+    Serial.println(client.state());
+  }
+  */
+  // Serial.print("BEFORE : ");
+  // Serial.println(client.state());
+
+  client.subscribe(topic);
+  // delay(5000);
+  // Serial.print("AFTER : ");
+  // Serial.println(client.state());
+
+  client.publish(topic, "Hello from ESP8266");
+
+  // digitalWrite(LED_BUILTIN, LOW);
+  // digitalWrite(D1, HIGH);
+}
+
+void loop()
+{
+  if (!client.connected())
+  {
+    reconnect();
+  }
+  client.loop();
+}
